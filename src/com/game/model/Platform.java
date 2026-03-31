@@ -9,54 +9,64 @@ public class Platform {
     public int x, y, width, height;
     private static Image imgL, imgC, imgR;
 
-    // --- VẬT CẢN TRÊN BỤC ---
+    // --- LOGIC DI CHUYỂN ---
+    public boolean isMoving;
+    private int startY;
+    private int moveRange = 100; // Khoảng cách di chuyển lên xuống
+    private int moveDir = 1;    // 1: Xuống, -1: Lên
+    private int moveSpeed = 2;
+
     public Mouse mouse; 
     public Saw saw;
-
     public int obstacleWidth = 45; 
     public int obstacleHeight = 45;
 
-    public Platform(int x, int y, int width, int height, boolean hasMouse, boolean hasSaw) {
+    public Platform(int x, int y, int width, int height, boolean hasMouse, boolean hasSaw, boolean isMoving) {
         this.x = x;
         this.y = y;
+        this.startY = y; // Lưu vị trí gốc để giới hạn tầm di chuyển
         this.width = width;
         this.height = height;
+        this.isMoving = isMoving;
 
-        // Tải ảnh gạch
         try {
             if (imgL == null) imgL = ImageIO.read(new File("brick_left.png"));
             if (imgC == null) imgC = ImageIO.read(new File("brick_center.png"));
             if (imgR == null) imgR = ImageIO.read(new File("brick_right.png"));
         } catch (Exception e) {}
 
-        // Tính toán vị trí chính giữa bục cho vật cản
         int obsX = x + (width / 2) - (obstacleWidth / 2);
-        
-        // Khởi tạo vật cản tương ứng (Chỉ 1 trong 2)
         if (hasMouse) {
-            // Kích thước chuột 40x30, đặt trên mặt đất
             this.mouse = new Mouse(obsX, y - 30 + 5, 40, 30); 
         } else if (hasSaw) {
-            // Kích thước cưa 45x45, hơi cắm xuống đất
             this.saw = new Saw(obsX, y - 45 + 10, 45, 45);
         }
     }
 
     public void update(int scrollSpeed) {
-        // Bục đất trôi đi
         this.x -= scrollSpeed; 
+
+        // Nếu là bục di động, cập nhật tọa độ Y
+        if (isMoving) {
+            this.y += (moveDir * moveSpeed);
+            // Nếu vượt quá phạm vi thì đổi chiều
+            if (Math.abs(this.y - startY) > moveRange) {
+                moveDir *= -1;
+            }
+        }
         
-        // Cập nhật vị trí vật cản trôi theo bục
+        // Cập nhật vị trí vật cản đi theo bục (cả X và Y)
         if (mouse != null) {
+            mouse.y = this.y - mouse.height + 5; // Cập nhật Y cho chuột
             mouse.update(scrollSpeed, this.x, this.width); 
         }
         if (saw != null) {
+            saw.y = this.y - saw.height + 10; // Cập nhật Y cho cưa
             saw.update(scrollSpeed); 
         }
     }
 
     public void draw(Graphics g) {
-        // 1. Vẽ bục đất (3 phần: Trái, Giữa, Phải)
         if (imgL != null && imgC != null && imgR != null) {
             int side = 40;
             g.drawImage(imgL, x, y, side, height, null);
@@ -67,16 +77,10 @@ public class Platform {
             g.fillRect(x, y, width, height);
         }
 
-        // 2. Vẽ vật cản lên trên bục
-        if (mouse != null) {
-            mouse.draw(g); 
-        }
-        if (saw != null) {
-            saw.draw(g); 
-        }
+        if (mouse != null) mouse.draw(g); 
+        if (saw != null) saw.draw(g); 
     }
 
-    // --- HÀM LẤY HỘP VA CHẠM CHO GAMEPANEL ---
     public Rectangle getMouseHitbox() { 
         if (mouse == null) return null;
         return mouse.getMouseHitbox(); 

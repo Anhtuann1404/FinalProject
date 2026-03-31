@@ -3,20 +3,16 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
-import java.io.IOException;
 import javax.imageio.ImageIO;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
-// Import các lớp từ package khác (Model)
-import com.game.model.Player;
-import com.game.model.Platform;
-import com.game.model.AudioSensor;
+// Import các class từ package model
+import com.game.model.*; 
 
 public class GamePanel extends JPanel implements ActionListener, KeyListener {
-    // Kích thước chuẩn - Để private để đảm bảo tính đóng gói (Encapsulation)
     private final int WIDTH = 950;
     private final int HEIGHT = 600;
     
@@ -28,115 +24,94 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
     private int score = 0;
     private boolean isGameOver = false;
     private Random random = new Random();
-
-    // NGƯỠNG ÂM THANH (Dễ dàng tinh chỉnh cho phần Demo)
-    private final double WALK_VOL = 5.0;  
-    private final double JUMP_VOL = 18.0; 
+    private int difficultyLevel = 1;
 
     public GamePanel() {
         this.setPreferredSize(new Dimension(WIDTH, HEIGHT));
         this.setFocusable(true);
         this.addKeyListener(this); 
 
-        // 1. XỬ LÝ NGOẠI LỆ (Đáp ứng tiêu chí Exception Handling)
         try { 
-            bgImage = ImageIO.read(new File("background.png")); 
-        } catch (IOException e) {
-            System.err.println("Lỗi: Không tìm thấy file background.png. Vui lòng kiểm tra thư mục dự án.");
-        }
+            File f = new File("background.png");
+            if(f.exists()) bgImage = ImageIO.read(f);
+        } catch (Exception e) {}
 
         resetGame();
         
-        // Khởi tạo và chạy luồng âm thanh
-        audioSensor = new AudioSensor();
-        new Thread(audioSensor).start();
+        try {
+            audioSensor = new AudioSensor();
+            new Thread(audioSensor).start();
+        } catch (Exception e) {}
         
-        // Game Loop (60 FPS)
         gameTimer = new Timer(16, this);
         gameTimer.start();
     }
 
     private void resetGame() {
         score = 0;
+        difficultyLevel = 1;
         isGameOver = false;
-        if(platforms != null) platforms.clear();
-        
-        // Bục xuất phát
-        platforms.add(new Platform(0, 480, 400, 250, false, false));
+        platforms.clear();
+        // Bục xuất phát: Cố định, không di chuyển (false cuối cùng)
+        platforms.add(new Platform(0, 480, 400, 250, false, false, false));
         player = new Player(150, 100); 
-        
-        for(int i = 0; i < 6; i++) {
-            generateNextPlatform();
-        }
+        for(int i = 0; i < 6; i++) generateNextPlatform();
     }
 
     private void generateNextPlatform() {
         if (platforms.isEmpty()) return;
         Platform last = platforms.get(platforms.size() - 1);
         
-        int gap = 160 + random.nextInt(150);
+        int maxGap = Math.min(320, 160 + (difficultyLevel * 15)); 
+        int gap = 150 + random.nextInt(maxGap);
+        
         int nextX = last.x + last.width + gap;
-        int nextY = Math.max(280, Math.min(520, last.y + (random.nextInt(160) - 80)));
-        int nextWidth = 200 + random.nextInt(200);
+        int nextY = Math.max(250, Math.min(500, last.y + (random.nextInt(180) - 90)));
+        int nextWidth = Math.max(120, 250 - (difficultyLevel * 10)) + random.nextInt(150);
         
         boolean addMouse = false;
         boolean addSaw = false;
+        boolean isMoving = false;
+
+        // TỶ LỆ XUẤT HIỆN BIẾN THỂ (Tăng theo level)
+        int rand = random.nextInt(100);
         
-        if (nextWidth >= 250) {
-            int rand = random.nextInt(100);
-            if (rand < 25) addMouse = true; 
-            else if (rand < 50) addSaw = true;   
+        // 20% khả năng là bục di động (chỉ xuất hiện từ level 2 trở đi)
+        if (difficultyLevel >= 2 && rand < 20) {
+            isMoving = true;
+        } else {
+            // Nếu không di chuyển thì mới xét thêm chuột hoặc cưa
+            int obstacleChance = Math.min(50, 20 + (difficultyLevel * 5));
+            int obsRand = random.nextInt(100);
+            if (obsRand < obstacleChance / 2) addMouse = true;
+            else if (obsRand < obstacleChance) addSaw = true;
         }
-        platforms.add(new Platform(nextX, nextY, nextWidth, 300, addMouse, addSaw));
+
+        platforms.add(new Platform(nextX, nextY, nextWidth, 300, addMouse, addSaw, isMoving));
     }
 
-    // --- PHẦN CONTROLLER: XỬ LÝ LOGIC ---
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (isGameOver) { 
-            repaint(); 
-            return; 
-        }
-        updateGameLogic();
-        repaint();
-    }
+        if (isGameOver) { repaint(); return; }
 
-    private void updateGameLogic() {
-        // 1. Cập nhật vật lý nhân vật
-        player.update(platforms);
-
-        // 2. Kiểm tra va chạm (Collision Detection)
-        checkCollisions();
-
-        // 3. Xử lý âm thanh điều khiển di chuyển
-        handleAudioInput();
-
-        // 4. Kiểm tra rơi vực
-        if (player.getY() > HEIGHT) {
-            isGameOver = true;
-        }
-    }
-
-    private void handleAudioInput() {
-        double vol = audioSensor.getCurrentVolume();
+        // Cập nhật bục trước để nhân vật có thể đứng lên bục đang di chuyển
         int speed = 0;
-
-        if (audioSensor.isCalibrated()) {
-            if (vol > JUMP_VOL) {
+        if (audioSensor != null && audioSensor.isCalibrated()) {
+            double vol = audioSensor.getCurrentVolume();
+            int speedBonus = difficultyLevel - 1; 
+            if (vol > 18.0) { // JUMP_VOL
                 player.jump(vol); 
-                speed = 8; 
+                speed = 8 + speedBonus; 
                 score += 2;
-            } else if (vol > WALK_VOL) {
-                speed = 4; 
+            } else if (vol > 5.0) { // WALK_VOL
+                speed = 4 + speedBonus; 
                 score += 1;
             }
         }
 
-        // Di chuyển thế giới game (Side Scrolling)
-        moveWorld(speed);
-    }
+        difficultyLevel = (score / 1000) + 1; 
 
-    private void moveWorld(int speed) {
+        // Cập nhật tất cả bục
         Iterator<Platform> it = platforms.iterator();
         while (it.hasNext()) {
             Platform p = it.next();
@@ -144,69 +119,68 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             if (p.x + p.width < -100) it.remove(); 
         }
 
-        if (platforms.size() < 10) generateNextPlatform();
-    }
+        // Sau đó mới cập nhật nhân vật (để xử lý va chạm chính xác với bục đang di chuyển)
+        if (player != null) player.update(platforms);
 
-    private void checkCollisions() {
-        // Hitbox tinh chỉnh để khớp với hình ảnh nhân vật
+        // Kiểm tra va chạm vật cản
         Rectangle playerHitbox = new Rectangle(150 + 15, player.getY() + 10, 60 - 30, 75 - 10);
         for (Platform p : platforms) {
-            if ((p.getMouseHitbox() != null && playerHitbox.intersects(p.getMouseHitbox())) || 
-                (p.getSawHitbox() != null && playerHitbox.intersects(p.getSawHitbox()))) {
+            Rectangle mH = p.getMouseHitbox();
+            Rectangle sH = p.getSawHitbox();
+            if ((mH != null && playerHitbox.intersects(mH)) || (sH != null && playerHitbox.intersects(sH))) {
                 isGameOver = true; 
                 break;
             }
         }
+
+        if (platforms.size() < 10) generateNextPlatform();
+        if (player.getY() > HEIGHT) isGameOver = true;
+
+        repaint();
     }
 
-    // --- PHẦN VIEW: VẼ GIAO DIỆN ---
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
-        
-        // Khử răng cưa giúp game trông mượt hơn
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        
         if (bgImage != null) g2d.drawImage(bgImage, 0, 0, WIDTH, HEIGHT, null);
-        
         for (Platform p : platforms) p.draw(g2d);
-        player.draw(g2d);
-
+        if (player != null) player.draw(g2d);
         drawUI(g2d);
-        
-        if (isGameOver) drawGameOverScreen(g2d);
     }
 
     private void drawUI(Graphics2D g2d) {
-        g2d.setColor(Color.WHITE);
-        g2d.setFont(new Font("Arial", Font.BOLD, 20));
-        g2d.drawString("Score: " + score, 20, 40);
+        g2d.setColor(Color.BLACK);
+        g2d.setFont(new Font("Arial", Font.BOLD, 22));
+        g2d.drawString("ĐIỂM: " + (score/10), 30, 40);
+        g2d.setColor(new Color(255, 69, 0));
+        g2d.drawString("LEVEL: " + difficultyLevel, WIDTH - 150, 40);
         
-        // Vẽ thanh đo âm lượng để giảng viên thấy Mic đang hoạt động
-        g2d.drawString("Mic Level:", 20, 70);
-        g2d.setColor(Color.GREEN);
-        g2d.fillRect(120, 55, (int)audioSensor.getCurrentVolume() * 5, 20);
-    }
+        if (audioSensor != null) {
+            int v = (int)audioSensor.getCurrentVolume();
+            g2d.setColor(Color.BLACK);
+            g2d.drawString("MIC:", 30, 80);
+            g2d.setColor(Color.WHITE);
+            g2d.drawRect(80, 62, 200, 20); 
+            if (v > 18.0) g2d.setColor(Color.RED); else if (v > 5.0) g2d.setColor(Color.ORANGE); else g2d.setColor(Color.GREEN);
+            g2d.fillRect(80, 62, Math.min(200, v * 4), 20);
+            if (!audioSensor.isCalibrated()) {
+                g2d.setColor(new Color(0, 0, 0, 160)); g2d.fillRect(0, 0, WIDTH, HEIGHT);
+                g2d.setColor(Color.WHITE); g2d.setFont(new Font("Arial", Font.BOLD, 26));
+                g2d.drawString("ĐANG ĐO TIẾNG ỒN MÔI TRƯỜNG...", WIDTH/2 - 220, HEIGHT/2 - 20);
+            }
+        }
 
-    private void drawGameOverScreen(Graphics2D g2d) {
-        g2d.setColor(new Color(0, 0, 0, 150));
-        g2d.fillRect(0, 0, WIDTH, HEIGHT);
-        g2d.setColor(Color.RED);
-        g2d.setFont(new Font("Arial", Font.BOLD, 50));
-        g2d.drawString("GAME OVER", WIDTH/2 - 150, HEIGHT/2);
-        g2d.setFont(new Font("Arial", Font.PLAIN, 20));
-        g2d.setColor(Color.WHITE);
-        g2d.drawString("Press 'R' to Restart", WIDTH/2 - 80, HEIGHT/2 + 50);
-    }
-
-    // --- XỬ LÝ SỰ KIỆN PHÍM ---
-    @Override
-    public void keyPressed(KeyEvent e) {
-        if (e.getKeyCode() == KeyEvent.VK_R && isGameOver) {
-            resetGame();
+        if (isGameOver) {
+            g2d.setColor(new Color(0, 0, 0, 180)); g2d.fillRect(0, 0, WIDTH, HEIGHT);
+            g2d.setColor(Color.RED); g2d.setFont(new Font("Arial", Font.BOLD, 65));
+            g2d.drawString("THẤT BẠI!", WIDTH/2 - 160, HEIGHT/2 - 20);
+            g2d.setColor(Color.WHITE); g2d.setFont(new Font("Arial", Font.PLAIN, 26));
+            g2d.drawString("NHẤN SPACE ĐỂ CHƠI LẠI", WIDTH/2 - 170, HEIGHT/2 + 50);
         }
     }
+
+    @Override public void keyPressed(KeyEvent e) { if (isGameOver && e.getKeyCode() == KeyEvent.VK_SPACE) resetGame(); }
     @Override public void keyReleased(KeyEvent e) {}
     @Override public void keyTyped(KeyEvent e) {}
 }
