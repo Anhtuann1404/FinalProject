@@ -38,13 +38,11 @@ public class Platform {
 
         // LOGIC SINH VÀNG: Chỉ sinh vàng nếu bục đủ rộng và KHÔNG có vật cản
         Random rand = new Random();
-        if (!hasMouse && !hasSaw && rand.nextInt(100) < 50) {
-            int numCoins = 1 + rand.nextInt(3);
-            for (int i = 0; i < numCoins; i++) {
-                // Vàng sẽ bắt đầu từ giữa bục trở đi để tránh bị trùng với nhân vật lúc đầu
-                coins.add(new Coin(x + (width/3) + (i * 45), y - 40));
-            }
+        if (!hasMouse && !hasSaw && rand.nextInt(100) < 50) { 
+            int numCoins = 1 + rand.nextInt(3); 
+            for (int i = 0; i < numCoins; i++) coins.add(new Coin(x + 50 + (i * 40), y - 40));
         }
+        
     }
 
     public void update(int scrollSpeed) {
