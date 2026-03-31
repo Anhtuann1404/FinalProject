@@ -1,30 +1,26 @@
 package com.game.model;
-import java.awt.Graphics;
-import java.awt.Image;
-import java.awt.Rectangle;
+
+import java.awt.*;
 import java.io.File;
 import javax.imageio.ImageIO;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 public class Platform {
     public int x, y, width, height;
     private static Image imgL, imgC, imgR;
-
-    // --- LOGIC DI CHUYỂN ---
     public boolean isMoving;
-    private int startY;
-    private int moveRange = 100; // Khoảng cách di chuyển lên xuống
-    private int moveDir = 1;    // 1: Xuống, -1: Lên
-    private int moveSpeed = 2;
+    private int startY, moveDir = 1, moveSpeed = 2;
 
     public Mouse mouse; 
     public Saw saw;
-    public int obstacleWidth = 45; 
-    public int obstacleHeight = 45;
+    public List<Coin> coins = new ArrayList<>();
 
     public Platform(int x, int y, int width, int height, boolean hasMouse, boolean hasSaw, boolean isMoving) {
         this.x = x;
         this.y = y;
-        this.startY = y; // Lưu vị trí gốc để giới hạn tầm di chuyển
+        this.startY = y;
         this.width = width;
         this.height = height;
         this.isMoving = isMoving;
@@ -35,59 +31,55 @@ public class Platform {
             if (imgR == null) imgR = ImageIO.read(new File("brick_right.png"));
         } catch (Exception e) {}
 
-        int obsX = x + (width / 2) - (obstacleWidth / 2);
-        if (hasMouse) {
-            this.mouse = new Mouse(obsX, y - 30 + 5, 40, 30); 
-        } else if (hasSaw) {
-            this.saw = new Saw(obsX, y - 45 + 10, 45, 45);
+        // Đặt vật cản ở giữa bục
+        int obsX = x + (width / 2) - 22;
+        if (hasMouse) this.mouse = new Mouse(obsX, y - 25, 40, 30);
+        else if (hasSaw) this.saw = new Saw(obsX, y - 35, 45, 45);
+
+        // LOGIC SINH VÀNG: Chỉ sinh vàng nếu bục đủ rộng và KHÔNG có vật cản
+        Random rand = new Random();
+        if (!hasMouse && !hasSaw && rand.nextInt(100) < 50) {
+            int numCoins = 1 + rand.nextInt(3);
+            for (int i = 0; i < numCoins; i++) {
+                // Vàng sẽ bắt đầu từ giữa bục trở đi để tránh bị trùng với nhân vật lúc đầu
+                coins.add(new Coin(x + (width/3) + (i * 45), y - 40));
+            }
         }
     }
 
     public void update(int scrollSpeed) {
-        this.x -= scrollSpeed; 
-
-        // Nếu là bục di động, cập nhật tọa độ Y
+        this.x -= scrollSpeed;
         if (isMoving) {
             this.y += (moveDir * moveSpeed);
-            // Nếu vượt quá phạm vi thì đổi chiều
-            if (Math.abs(this.y - startY) > moveRange) {
-                moveDir *= -1;
-            }
+            if (Math.abs(this.y - startY) > 80) moveDir *= -1;
         }
         
-        // Cập nhật vị trí vật cản đi theo bục (cả X và Y)
         if (mouse != null) {
-            mouse.y = this.y - mouse.height + 5; // Cập nhật Y cho chuột
-            mouse.update(scrollSpeed, this.x, this.width); 
+            mouse.y = this.y - mouse.height + 5;
+            mouse.update(scrollSpeed, this.x, this.width);
         }
         if (saw != null) {
-            saw.y = this.y - saw.height + 10; // Cập nhật Y cho cưa
-            saw.update(scrollSpeed); 
+            saw.y = this.y - saw.height + 10;
+            saw.update(scrollSpeed);
         }
+        for (Coin c : coins) c.update(scrollSpeed, this.y);
     }
 
     public void draw(Graphics g) {
-        if (imgL != null && imgC != null && imgR != null) {
+        if (imgL != null) {
             int side = 40;
             g.drawImage(imgL, x, y, side, height, null);
             g.drawImage(imgC, x + side, y, width - (side * 2), height, null);
             g.drawImage(imgR, x + width - side, y, side, height, null);
         } else {
-            g.setColor(new java.awt.Color(139, 69, 19));
+            g.setColor(new Color(139, 69, 19));
             g.fillRect(x, y, width, height);
         }
-
-        if (mouse != null) mouse.draw(g); 
-        if (saw != null) saw.draw(g); 
+        if (mouse != null) mouse.draw(g);
+        if (saw != null) saw.draw(g);
+        for (Coin c : coins) c.draw(g);
     }
 
-    public Rectangle getMouseHitbox() { 
-        if (mouse == null) return null;
-        return mouse.getMouseHitbox(); 
-    }
-    
-    public Rectangle getSawHitbox() { 
-        if (saw == null) return null;
-        return saw.getHitbox(); 
-    }
+    public Rectangle getMouseHitbox() { return mouse != null ? mouse.getMouseHitbox() : null; }
+    public Rectangle getSawHitbox() { return saw != null ? saw.getHitbox() : null; }
 }
