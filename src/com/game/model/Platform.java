@@ -37,12 +37,20 @@ public class Platform {
         else if (hasSaw) this.saw = new Saw(obsX, y - 35, 45, 45);
 
         // LOGIC SINH VÀNG: Chỉ sinh vàng nếu bục đủ rộng và KHÔNG có vật cản
-        Random rand = new Random();
-        if (!hasMouse && !hasSaw && rand.nextInt(100) < 50) { 
-            int numCoins = 1 + rand.nextInt(3); 
-            for (int i = 0; i < numCoins; i++) coins.add(new Coin(x + 50 + (i * 40), y - 40));
+        if (!hasMouse && !hasSaw && width >= 150) {
+            Random rand = new Random();
+            int numCoins = rand.nextInt(3) + 1; // Random sinh từ 1 đến 3 đồng xu
+            int spacing = 45; // Khoảng cách giữa các đồng xu
+            
+            // Tính toán vị trí X bắt đầu để nhóm xu nằm ngay giữa bục
+            int startCoinX = x + (width / 2) - ((numCoins * spacing) / 2);
+            
+            for (int i = 0; i < numCoins; i++) {
+                // TRỌNG TÂM LÀ ĐÂY: y - 150 sẽ đẩy xu lên rất cao
+                // Bắt buộc người chơi phải HÉT TO để nhảy tới
+                coins.add(new Coin(startCoinX + (i * spacing), y - 150));
+            }
         }
-        
     }
 
     public void update(int scrollSpeed) {
