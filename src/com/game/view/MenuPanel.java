@@ -1,7 +1,10 @@
-package GameCK;
+package com.game.view;
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+
+import com.game.controller.Main;
+
 import javax.swing.ImageIcon;
 import java.awt.Color;
 import java.awt.Dimension;

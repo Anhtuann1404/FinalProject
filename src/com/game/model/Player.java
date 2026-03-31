@@ -1,8 +1,9 @@
-package GameCK;
+package com.game.model;
 import java.awt.Graphics;
 import java.awt.Image;
 import java.io.File;
 import javax.imageio.ImageIO;
+
 import java.util.List;
 
 public class Player {

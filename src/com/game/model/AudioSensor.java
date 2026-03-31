@@ -1,4 +1,4 @@
-package GameCK;
+package com.game.model;
 import javax.sound.sampled.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

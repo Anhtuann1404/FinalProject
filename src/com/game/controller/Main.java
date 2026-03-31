@@ -1,6 +1,9 @@
-package GameCK;
+package com.game.controller;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
+
+import com.game.view.GamePanel;
+import com.game.view.MenuPanel;
 
 public class Main extends JFrame {
     private MenuPanel menuPanel;
